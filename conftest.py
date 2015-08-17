@@ -95,6 +95,9 @@ def pytest_configure():
             "DEFAULT_PARSER_CLASSES": (
                 "rest_framework_json_api.parsers.JsonApiParser",
             ),
+            "DEFAULT_PAGINATION_CLASS": (
+                "rest_framework_json_api.pagination.JsonApiPageNumberPagination"
+                ),
             "TEST_REQUEST_DEFAULT_FORMAT": "json",
         },
     )

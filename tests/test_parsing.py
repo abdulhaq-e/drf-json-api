@@ -8,9 +8,11 @@ pytestmark = pytest.mark.django_db
 
 def test_basic(client):
     test_data = dump_json({
-        "people": {
-            "name": "test",
-        },
+        "data": {
+            "attributes": {
+                "name": "test",
+            }
+        }
     })
 
     output_data = {
@@ -26,12 +28,16 @@ def test_basic(client):
 
 def test_multiple(client):
     test_data = dump_json({
-        "people": [
+        "data": [
             {
-                "name": "first",
+                "attributes": {
+                    "name": "first"
+                }
             },
             {
-                "name": "second",
+                "attributes": {
+                    "name": "second"
+                }
             },
         ],
     })
@@ -55,12 +61,16 @@ def test_multiple(client):
 
 def test_single_link(client):
     test_data = dump_json({
-        "comments": {
-            "body": "This is a test comment.",
-            "links": {
-                "post": "1",
+        "data": {
+            "attributes": {
+                "body": "This is a test comment.",
             },
-        },
+            "relationships": {
+                "post": {
+                    "data": {"type": "posts", "id": "1"}
+                },
+            },
+        }
     })
 
     output_data = {
@@ -78,10 +88,17 @@ def test_single_link(client):
 
 def test_multiple_link(client):
     test_data = dump_json({
-        "posts": {
-            "title": "Test post title",
-            "links": {
-                "comments": ["1", "2"],
+        "data": {
+            "attributes": {
+                "title": "Test post title",
+            },
+            "relationships": {
+                "comments": {
+                    "data": [
+                        {"type": "comments", "id": "1"},
+                        {"type": "comments", "id": "2"}
+                    ]
+                }
             },
         }
     })

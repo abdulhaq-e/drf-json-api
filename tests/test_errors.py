@@ -40,7 +40,9 @@ def test_required_field_omitted(client):
 
     results = {
         "errors": [{
-            "path": "/name",
+            "source": {
+                "pointer": "/name"
+            },
             "detail": "This field is required.",
             "status": "400"
         }]
@@ -53,7 +55,7 @@ def test_auth_required(rf):
     class RestrictedPersonViewSet(PersonViewSet):
         permission_classes = [IsAuthenticated]
 
-    data = dump_json({"people": {"name": "Jason Api"}})
+    data = dump_json({"data": {"attributes": {"name": "Jason Api"}}})
 
     request = rf.post(
         reverse("person-list"), data=data,
@@ -83,7 +85,7 @@ def test_drf_non_field_validation_error(rf):
     class LazyPersonViewSet(PersonViewSet):
         serializer_class = LazyPersonSerializer
 
-    data = dump_json({"people": {"name": "Jason Api"}})
+    data = dump_json({"data": {"attributes": {"name": "Jason Api"}}})
 
     request = rf.post(
         reverse("person-list"), data=data,
@@ -98,7 +100,9 @@ def test_drf_non_field_validation_error(rf):
     results = {
         "errors": [{
             "status": "400",
-            "path": "/-",
+            "source": {
+                "pointer": "/-"
+            },
             "detail": "Feeling lazy. Try again later."
         }]
     }

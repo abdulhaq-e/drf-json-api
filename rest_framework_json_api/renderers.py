@@ -68,8 +68,10 @@ class JsonApiMixin(object):
             raise WrapperNotApplicable(
                 'No acceptable wrappers found for response.',
                 data=data, renderer_context=renderer_context)
-
+        print renderer_context
         renderer_context["indent"] = 4
+        renderer_context["sort_keys"] = True
+        renderer_context["separators"] = (", ", "::")
 
         return super(JsonApiMixin, self).render(
             data=wrapper,
@@ -236,10 +238,11 @@ class JsonApiMixin(object):
                     error["detail"] = issue
 
                 if keys_are_fields:
+                    error["source"] = self.dict_class()
                     if field in ('non_field_errors', NON_FIELD_ERRORS):
-                        error["path"] = '/-'
+                        error["source"]["pointer"] = '/-'
                     else:
-                        error["path"] = '/' + field
+                        error["source"]["pointer"] = '/' + field
 
                 errors.append(error)
         wrapper = self.dict_class()
@@ -258,9 +261,9 @@ class JsonApiMixin(object):
         return wrapper
 
     def wrap_paginated(self, data, renderer_context):
-        """Convert paginated data to JSON API with meta"""
+        """Convert paginated data to JSON API with links"""
 
-        pagination_keys = ['count', 'next', 'previous', 'results']
+        pagination_keys = ['first', 'last', 'prev', 'next']
         for key in pagination_keys:
             if not (data and key in data):
                 raise WrapperNotApplicable('Not paginated results')
@@ -274,7 +277,7 @@ class JsonApiMixin(object):
 
             results = ReturnList(
                 data["results"],
-                serializer=data.serializer.fields["results"],
+                serializer=data["results"].serializer
             )
         except ImportError:
             results = data["results"]
@@ -285,7 +288,9 @@ class JsonApiMixin(object):
         # Add pagination metadata
         pagination = self.dict_class()
 
-        pagination["prev"] = data['previous']
+        pagination["first"] = data['first']
+        pagination["last"] = data['last']
+        pagination["prev"] = data['prev']
         pagination["next"] = data['next']
 
         wrapper.setdefault("links", self.dict_class())
@@ -302,38 +307,46 @@ class JsonApiMixin(object):
         """
 
         wrapper = self.dict_class()
-        view = renderer_context.get("view", None)
+        # view = renderer_context.get("view", None)
         request = renderer_context.get("request", None)
 
-        model = self.model_from_obj(view)
-        resource_type = self.model_to_resource_type(model)
+        #model = self.model_from_obj(view)
+        #resource_type = self.model_to_resource_type(model)
 
         if isinstance(data, list):
             many = True
-            resources = data
+            try:
+                from rest_framework.utils.serializer_helpers import ReturnDict
+                resources = [ReturnDict(resource,
+                                    serializer=data.serializer.child
+                ) for resource in data]
+            except ImportError:
+                resources = data
+
         else:
             many = False
             resources = [data]
 
         items = []
-        included = {}
+        included = []
 
         for resource in resources:
+
             converted = self.convert_resource(resource, data, request)
 
             converted_data = converted.get("data", {})
             items.append(converted_data)
 
             converted_included = converted.get("included", {})
-            included.update(converted_included)
+            included.extend(converted_included)
 
         if many:
             wrapper["data"] = items
         else:
             wrapper["data"] = items[0]
 
-        if included:
-            wrapper["included"] = included.items()
+        if included and included[0]:
+            wrapper["included"] = included
 
         return wrapper
 
@@ -346,6 +359,8 @@ class JsonApiMixin(object):
         data = self.dict_class()
         included = self.dict_class()
         meta = self.dict_class()
+        attributes = self.dict_class()
+        data["attributes"] = attributes
 
         for field_name, field in six.iteritems(fields):
             converted = None
@@ -370,24 +385,27 @@ class JsonApiMixin(object):
                     data,
                     converted.pop("data", {})
                 )
-                included = self.update_nested(
-                    included,
-                    converted.get("included", {})
-                )
+                included = converted.get("included", [])
+                # self.update_nested(
+                #     included,
+                #     converted.get("included", {})
+                # )
                 meta = self.update_nested(
                     meta,
                     converted.get("meta", {})
                 )
             else:
-                data[field_name] = resource[field_name]
+                attributes = self.update_nested(
+                    attributes,
+                    {field_name: resource[field_name], }
+                )
 
-        if hasattr(resource, "serializer"):
-            serializer = resource.serializer
-            model = serializer.Meta.model
+        # if hasattr(resource, "serializer"):
+        #     serializer = resource.serializer
+        #     model = serializer.Meta.model
+        #     resource_type = model_to_resource_type(model)
 
-            resource_type = self.model_to_resource_type(model)
-
-            data["type"] = resource_type
+        #     data["type"] = resource_type
 
         return {
             "data": data,
@@ -399,6 +417,13 @@ class JsonApiMixin(object):
         data = self.dict_class()
 
         data[field_name] = encoding.force_text(resource[field_name])
+
+        if hasattr(resource, "serializer"):
+            serializer = resource.serializer
+            model = serializer.Meta.model
+            resource_type = model_to_resource_type(model)
+
+            data["type"] = resource_type
 
         return {
             "data": data,
@@ -424,15 +449,27 @@ class JsonApiMixin(object):
 
         resource_type = self.model_to_resource_type(model)
 
-        linked_ids = self.dict_class()
-        links = self.dict_class()
-        linked = self.dict_class()
-        linked[resource_type] = []
+        included_ids = self.dict_class()
+        linkage = None
+        included = []
+        #included[resource_type] = []
 
         if is_related_many(field):
             items = resource[field_name]
+            linkage = []
+            ids = [encoding.force_text(item["id"]) for item in items]
+            for id in ids:
+                link = {
+                    "type": resource_type,
+                    "id": id,
+                }
+                linkage.append(link)
         else:
             items = [resource[field_name]]
+            linkage = {
+                "type": resource_type,
+                "id": encoding.force_text(items[0]["id"]),
+            }
 
         obj_ids = []
 
@@ -440,39 +477,48 @@ class JsonApiMixin(object):
 
         for item in items:
             converted = self.convert_resource(item, resource, request)
-            linked_obj = converted["data"]
-            linked_ids = converted.pop("linked_ids", {})
-
-            if linked_ids:
-                linked_obj["links"] = linked_ids
+            included_obj = converted["data"]
+            included_ids = converted.pop("linked_ids", {})
+            included_obj.update({"type": resource_type})
+            # if included_ids:
+            #     included_obj["links"] = linked_ids
 
             obj_ids.append(converted["data"]["id"])
 
-            field_links = self.prepend_links_with_name(
-                converted.get("links", {}), resource_type)
+            # field_links = self.prepend_links_with_name(
+            #     converted.get("links", {}), resource_type)
 
-            field_links[field_name] = {
-                "type": resource_type,
-            }
+            # field_links[field_name] = {
+            #     "type": resource_type,
+            # }
 
-            if "href" in converted["data"]:
-                url_field_name = api_settings.URL_FIELD_NAME
-                url_field = serializer_field.fields[url_field_name]
+            # if "href" in converted["data"]:
+            #     url_field_name = api_settings.URL_FIELD_NAME
+            #     url_field = serializer_field.fields[url_field_name]
 
-                field_links[field_name]["href"] = self.url_to_template(
-                    url_field.view_name, request, field_name,
-                )
+            #     field_links[field_name]["href"] = self.url_to_template(
+            #         url_field.view_name, request, field_name,
+            #     )
 
-            links.update(field_links)
+            # links.update(field_links)
 
-            linked[resource_type].append(linked_obj)
+            included.append(included_obj)
 
         if is_related_many(field):
-            linked_ids[field_name] = obj_ids
+            included_ids[field_name] = obj_ids
         else:
-            linked_ids[field_name] = obj_ids[0]
+            included_ids[field_name] = obj_ids[0]
 
-        return {"linked_ids": linked_ids, "links": links, "linked": linked}
+        return {
+            "data": {
+                "relationships": {
+                    field_name: {
+                        "data": linkage,
+                    }
+                }
+            },
+            "included": included
+        }
 
     def handle_related_field(self, resource, field, field_name, request):
         related_field = get_related_field(field)
@@ -501,12 +547,12 @@ class JsonApiMixin(object):
 
         return {
             "data": {
-                "links": {
+                "relationships": {
                     field_name: {
-                        "linkage": linkage,
-                    },
-                },
-            },
+                        "data": linkage,
+                    }
+                }
+            }
         }
 
     def handle_url_field(self, resource, field, field_name, request):
@@ -528,6 +574,8 @@ class JsonApiMixin(object):
                     "type": resource_type,
                     "id": pks,
                 }
+            # else:
+            #     linkage = "null"
         else:
             linkage = []
 
@@ -536,14 +584,13 @@ class JsonApiMixin(object):
                     "type": resource_type,
                     "id": pk,
                 }
-
                 linkage.append(link)
 
         return {
             "data": {
-                "links": {
+                "relationships": {
                     field_name: {
-                        "linkage": linkage,
+                        "data": linkage,
                     },
                 },
             },

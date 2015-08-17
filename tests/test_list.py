@@ -7,7 +7,7 @@ Error tests are in test_errors.py
 from django.core.urlresolvers import reverse
 from tests import models
 from tests.serializers import PostSerializer
-from tests.utils import dump_json
+from tests.utils import dump_json, parse_json
 from tests.views import PersonViewSet
 import pytest
 
@@ -16,7 +16,7 @@ pytestmark = pytest.mark.django_db
 
 def test_empty_list(client):
     results = {
-        "posts": [],
+        "data": [],
     }
 
     response = client.get(reverse("post-list"))
@@ -28,12 +28,17 @@ def test_single_item_list(client):
     models.Person.objects.create(name="test")
 
     results = {
-        "people": [
+        "data": [
             {
+                "attributes": {
+                    "name": "test"
+                },
+                "links": {
+                    "self": "http://testserver/people/1/"
+                },
                 "id": "1",
-                "href": "http://testserver/people/1/",
-                "name": "test",
-            },
+                "type": "people"
+            }
         ]
     }
 
@@ -47,17 +52,27 @@ def test_multiple_item_list(client):
     models.Person.objects.create(name="other")
 
     results = {
-        "people": [
+        "data": [
             {
+                "attributes": {
+                    "name": "test"
+                },
+                "links": {
+                    "self": "http://testserver/people/1/"
+                },
                 "id": "1",
-                "href": "http://testserver/people/1/",
-                "name": "test",
+                "type": "people"
             },
             {
+                "attributes": {
+                    "name": "other"
+                },
+                "links": {
+                    "self": "http://testserver/people/2/"
+                },
                 "id": "2",
-                "href": "http://testserver/people/2/",
-                "name": "other",
-            },
+                "type": "people"
+            }
         ]
     }
 
@@ -68,16 +83,21 @@ def test_multiple_item_list(client):
 
 def test_create_person_success(client):
     data = dump_json({
-        "people": {
+        "data": {
             "name": "Jason Api"
         }
     })
     results = {
-        "people": {
+        "data": {
             "id": "1",
-            "href": "http://testserver/people/1/",
-            "name": "Jason Api",
-        }
+            "type": "people",
+            "links": {
+                "self": "http://testserver/people/1/"
+            },
+            "attributes": {
+                "name": "Jason Api"
+            },
+        },
     }
 
     response = client.post(
@@ -95,11 +115,20 @@ def test_create_post_success(client):
     author = models.Person.objects.create(name="The Author")
 
     data = dump_json({
-        "posts": {
-            "title": "This is the title",
-            "links": {
-                "author": author.pk,
-                "comments": [],
+        "data": {
+            "type": "posts",
+            "attributes": {
+                "title": "This is the title",
+            },
+            "relationships": {
+                "author": {
+                    "data": {
+                        "id": author.pk
+                    }
+                },
+                "comments": {
+                    "data": [],
+                },
             },
         }
     })
@@ -112,26 +141,29 @@ def test_create_post_success(client):
 
     post = models.Post.objects.get()
     results = {
-        "posts": {
-            "id": str(post.pk),
-            "href": "http://testserver/posts/%s/" % post.pk,
-            "title": "This is the title",
-            "links": {
-                "author": str(author.pk),
-                "comments": []
-            }
-        },
-        "links": {
-            "posts.author": {
-                "href": "http://testserver/people/{posts.author}/",
-                "type": "people"
+        "data": {
+            "attributes": {
+                "title": "This is the title",
             },
-            "posts.comments": {
-                "href": "http://testserver/comments/{posts.comments}/",
-                "type": "comments"
+            "id": str(post.pk),
+            "type": "posts",
+            "links": {
+                "self": "http://testserver/posts/%s/" % post.pk,
+            },
+            "relationships": {
+                "author": {
+                    "data": {
+                        "id": str(author.pk),
+                        "type": "people"
+                    }
+                },
+                "comments": {
+                    "data": []
+                }
             }
         },
     }
+
     assert response.content == dump_json(results)
 
 
@@ -163,6 +195,7 @@ def test_options(client):
                     },
                     "title": {
                         "label": "Title",
+                        "max_length": 100,
                         "read_only": False,
                         "required": True,
                         "type": "string"
@@ -188,7 +221,8 @@ def test_options(client):
         results['meta']['actions']['POST'] = ps.metadata()
 
     response = client.options(reverse("post-list"))
-
+    print parse_json(response.content)
+    print(results)
     assert response.status_code == 200
     assert response.content == dump_json(results)
 
@@ -208,24 +242,25 @@ def test_pagination(rf):
     assert response.status_code == 200, response.content
 
     results = {
-        "people": [
+        "data": [
             {
+                "type": "people",
+                "attributes": {
+                    "name": "test",
+                },
                 "id": "1",
-                "href": "http://testserver/people/1/",
-                "name": "test",
+                "links": {
+                    "self": "http://testserver/people/1/",
+                },
+
             },
         ],
-        "meta": {
-            "pagination": {
-                "people": {
-                    "count": 1,
-                    "next": None,
-                    "previous": None,
-                }
-            }
-        }
+        "links": {
+            "first": "http://testserver/people/?page=1",
+            "last": "http://testserver/people/?page=1",
+            "prev": None,
+            "next": None
+        },
     }
-
-    assert response.content.decode("utf-8") == dump_json(results).decode("utf-8")
 
     assert response.content == dump_json(results)

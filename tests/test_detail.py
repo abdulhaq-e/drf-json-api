@@ -13,7 +13,10 @@ def test_object(client):
         "data": {
             "id": "1",
             "type": "people",
-            "name": "test",
+            "attributes":
+            {
+                "name": "test"
+            },
             "links": {
                 "self": "http://testserver/people/1/",
             }
@@ -21,8 +24,7 @@ def test_object(client):
     }
 
     response = client.get(reverse("person-detail", args=[1]))
-
-    assert parse_json(response.content) == results
+    assert response.content == dump_json(results)
 
 
 def test_object_with_optional_links(client):
@@ -32,22 +34,26 @@ def test_object_with_optional_links(client):
         "data": {
             "id": "1",
             "type": "people",
-            "name": "test",
-            "links": {
-                "self": "http://testserver/people/1/",
+            "attributes": {
+                "name": "test"
+            },
+            "relationships": {
                 "favorite_post": {
-                    "linkage": None,
+                    "data": None
                 },
                 "liked_comments": {
-                    "linkage": [],
-                },
+                    "data": []
+                }
+            },
+            "links": {
+                "self": "http://testserver/people/1/",
             },
         },
     }
 
     response = client.get(reverse("people-full-detail", args=[1]))
 
-    assert parse_json(response.content) == results
+    assert response.content == dump_json(results)
 
 
 def test_update_attribute(client):
@@ -55,22 +61,29 @@ def test_update_attribute(client):
 
     data = dump_json({
         "data": {
-            "name": "new test",
+            "attributes": {
+                "name": "new test",
+            },
         },
     })
+
     results = {
         "data": {
             "id": "1",
             "type": "people",
-            "name": "new test",
-            "links": {
-                "self": "http://testserver/people/1/",
+            "attributes": {
+                "name": "new test",
+            },
+            "relationships": {
                 "favorite_post": {
-                    "linkage": None,
+                    "data": None
                 },
                 "liked_comments": {
-                    "linkage": [],
-                },
+                    "data": []
+                }
+            },
+            "links": {
+                "self": "http://testserver/people/1/",
             },
         },
     }
@@ -79,7 +92,7 @@ def test_update_attribute(client):
         reverse("people-full-detail", args=[1]), data,
         content_type="application/vnd.api+json")
 
-    assert parse_json(response.content) == results
+    assert response.content == dump_json(results)
 
 
 def test_update_to_one_link(client):
@@ -89,10 +102,12 @@ def test_update_to_one_link(client):
 
     data = dump_json({
         "data": {
-            "name": "test",
-            "links": {
+            "attributes": {
+                "name": "test"
+                },
+            "relationships": {
                 "favorite_post": {
-                    "linkage": {
+                    "data": {
                         "type": "posts",
                         "id": str(post.pk),
                     },
@@ -104,17 +119,21 @@ def test_update_to_one_link(client):
         "data": {
             "id": "1",
             "type": "people",
-            "name": "test",
+            "attributes": {
+                "name": "test"
+            },
             "links": {
                 "self": "http://testserver/people/1/",
+            },
+            "relationships": {
                 "favorite_post": {
-                    "linkage": {
+                    "data": {
                         "type": "posts",
                         "id": str(post.pk),
-                    },
+                    }
                 },
                 "liked_comments": {
-                    "linkage": [],
+                    "data": [],
                 },
             },
         },
@@ -124,7 +143,7 @@ def test_update_to_one_link(client):
         reverse("people-full-detail", args=[1]), data,
         content_type="application/vnd.api+json")
 
-    assert parse_json(response.content) == results
+    assert response.content == dump_json(results)
 
 
 def test_update_to_many_link(client):
@@ -136,11 +155,15 @@ def test_update_to_many_link(client):
 
     data = dump_json({
         "data": {
-            "name": "test",
-            "links": {
-                "favorite_post": None,
+            "attributes": {
+                "name": "test",
+            },
+            "relationships": {
+                "favorite_post": {
+                    "data": None
+                },
                 "liked_comments": {
-                    "linkage": [
+                    "data": [
                         {
                             "type": "comments",
                             "id": str(comment1.pk),
@@ -158,14 +181,18 @@ def test_update_to_many_link(client):
         "data": {
             "id": "1",
             "type": "people",
-            "name": "test",
+            "attributes": {
+                "name": "test"
+            },
             "links": {
-                "self": "http://testserver/people/1/",
+                "self": "http://testserver/people/1/"
+            },
+            "relationships": {
                 "favorite_post": {
-                    "linkage": None,
+                    "data": None,
                 },
                 "liked_comments": {
-                    "linkage": [
+                    "data": [
                         {
                             "type": "comments",
                             "id": str(comment1.pk),
@@ -184,7 +211,7 @@ def test_update_to_many_link(client):
         reverse("people-full-detail", args=[1]), data,
         content_type="application/vnd.api+json")
 
-    assert parse_json(response.content) == results
+    assert response.content == dump_json(results)
 
 
 def test_object_with_pk_links(client):
@@ -194,22 +221,26 @@ def test_object_with_pk_links(client):
         "data": {
             "id": "1",
             "type": "people",
-            "name": "test",
+            "attributes": {
+                "name": "test"
+            },
             "links": {
                 "self": "http://testserver/people/1/",
+            },
+            "relationships": {
                 "favorite_post": {
-                    "linkage": None,
+                    "data": None,
                 },
                 "liked_comments": {
-                    "linkage": [],
-                },
-            },
-        },
+                    "data": [],
+                }
+            }
+        }
     }
 
     response = client.get(reverse("pk-people-full-detail", args=[1]))
 
-    assert parse_json(response.content) == results
+    assert response.content == dump_json(results)
 
 
 def test_update_pk_attribute(client):
@@ -218,13 +249,15 @@ def test_update_pk_attribute(client):
     data = dump_json({
         "data": {
             "type": "people",
-            "name": "new test",
-            "links": {
+            "attributes": {
+                "name": "new test"
+            },
+            "relationships": {
                 "favorite_post": {
-                    "linkage": None,
+                    "data": None,
                 },
                 "liked_comments": {
-                    "linkage": [],
+                    "data": [],
                 },
             },
         },
@@ -234,14 +267,18 @@ def test_update_pk_attribute(client):
         "data": {
             "id": "1",
             "type": "people",
-            "name": "new test",
+            "attributes": {
+                "name": "new test"
+            },
             "links": {
-                "self": "http://testserver/people/1/",
+                "self": "http://testserver/people/1/"
+            },
+            "relationships": {
                 "favorite_post": {
-                    "linkage": None,
+                    "data": None,
                 },
                 "liked_comments": {
-                    "linkage": [],
+                    "data": [],
                 },
             },
         },
@@ -251,7 +288,7 @@ def test_update_pk_attribute(client):
         reverse("pk-people-full-detail", args=[1]), data,
         content_type="application/vnd.api+json")
 
-    assert parse_json(response.content) == results
+    assert response.content == dump_json(results)
 
 
 def test_update_to_one_pk_link(client):
@@ -261,17 +298,19 @@ def test_update_to_one_pk_link(client):
 
     data = dump_json({
         "data": {
-            "name": "test",
+            "attributes": {
+                "name": "test"
+            },
             "type": "people",
-            "links": {
+            "relationships": {
                 "favorite_post": {
-                    "linkage": {
+                    "data": {
                         "type": "posts",
                         "id": str(post.pk),
                     }
                 },
                 "liked_comments": {
-                    "linkage": [],
+                    "data": [],
                 },
             },
         },
@@ -280,17 +319,21 @@ def test_update_to_one_pk_link(client):
         "data": {
             "id": "1",
             "type": "people",
-            "name": "test",
+            "attributes": {
+                "name": "test"
+            },
             "links": {
-                "self": "http://testserver/people/1/",
+                "self": "http://testserver/people/1/"
+            },
+            "relationships": {
                 "favorite_post": {
-                    "linkage": {
+                    "data": {
                         "type": "posts",
                         "id": str(post.pk),
                     },
                 },
                 "liked_comments": {
-                    "linkage": [],
+                    "data": [],
                 },
             },
         },
@@ -300,7 +343,7 @@ def test_update_to_one_pk_link(client):
         reverse("pk-people-full-detail", args=[1]), data,
         content_type="application/vnd.api+json")
 
-    assert parse_json(response.content) == results
+    assert response.content == dump_json(results)
 
 
 def test_update_to_many_pk_link(client):
@@ -312,14 +355,16 @@ def test_update_to_many_pk_link(client):
 
     data = dump_json({
         "data": {
-            "name": "test",
+            "attributes": {
+                "name": "test"
+            },
             "type": "people",
-            "links": {
+            "relationships": {
                 "favorite_post": {
-                    "linkage": None,
+                    "data": None,
                 },
                 "liked_comments": {
-                    "linkage": [
+                    "data": [
                         {
                             "type": "comments",
                             "id": str(comment1.pk),
@@ -337,14 +382,18 @@ def test_update_to_many_pk_link(client):
         "data": {
             "id": "1",
             "type": "people",
-            "name": "test",
+            "attributes": {
+                "name": "test"
+            },
             "links": {
-                "self": "http://testserver/people/1/",
+                "self": "http://testserver/people/1/"
+            },
+            "relationships": {
                 "favorite_post": {
-                    "linkage": None,
+                    "data": None,
                 },
                 "liked_comments": {
-                    "linkage": [
+                    "data": [
                         {
                             "type": "comments",
                             "id": str(comment1.pk),
@@ -363,4 +412,4 @@ def test_update_to_many_pk_link(client):
         reverse("pk-people-full-detail", args=[1]), data,
         content_type="application/vnd.api+json")
 
-    assert parse_json(response.content) == results
+    assert response.content == dump_json(results)

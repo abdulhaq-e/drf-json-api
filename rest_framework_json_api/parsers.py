@@ -35,21 +35,38 @@ class JsonApiMixin(object):
         fields = serializer_data.fields
 
         links = {}
+        relationships = {}
+        attributes = {}
 
         if "links" in resource:
             links = resource["links"]
 
             del resource["links"]
 
+        if "relationships" in resource:
+            relationships = resource["relationships"]
+
+            del resource["relationships"]
+
+        if "attributes" in resource:
+            attributes = resource["attributes"]
+
+            del resource["attributes"]
+
         for field_name, field in six.iteritems(fields):
-            if field_name not in links:
+
+            if field_name in attributes:
+                resource[field_name] = attributes[field_name]
+                continue
+
+            if field_name not in relationships:
                 continue
 
             related_field = get_related_field(field)
 
             if isinstance(related_field, relations.HyperlinkedRelatedField):
                 if is_related_many(field):
-                    pks = links[field_name]
+                    pks = [relation["id"] for relation in relationships[field_name]["data"]]
                     model = related_field.queryset.model
 
                     resource[field_name] = []
@@ -64,7 +81,11 @@ class JsonApiMixin(object):
 
                         resource[field_name].append(url)
                 else:
-                    pk = links[field_name]
+                    if relationships[field_name]["data"]:
+                        pk = relationships[field_name]["data"]["id"]
+                    else:
+                        pk = None
+
                     model = related_field.queryset.model
 
                     obj = model(pk=pk)
@@ -75,8 +96,22 @@ class JsonApiMixin(object):
                         url = related_field.to_native(obj)
 
                     resource[field_name] = url
+            elif isinstance(related_field, relations.PrimaryKeyRelatedField):
+                if is_related_many(field):
+                    pks = [relation["id"] for relation in relationships[field_name]["data"]]
+                    resource[field_name] = []
+
+                    for pk in pks:
+                        resource[field_name].append(pk)
+                else:
+                    if relationships[field_name]["data"]:
+                        pk = relationships[field_name]["data"]["id"]
+                    else:
+                        pk = None
+
+                    resource[field_name] = pk
             else:
-                resource[field_name] = links[field_name]
+                resource[field_name] = relationships[field_name]
 
         return resource
 

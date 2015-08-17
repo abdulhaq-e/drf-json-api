@@ -13,7 +13,7 @@ def dump_json(data):
     }
 
     if version[0] >= "3":
-        json_kwargs["separators"] = (", ", ": ", )
+        json_kwargs["separators"] = (",", ": ")
 
     return force_bytes(json.dumps(data, **json_kwargs))
 

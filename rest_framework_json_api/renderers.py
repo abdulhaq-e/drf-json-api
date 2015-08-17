@@ -346,6 +346,8 @@ class JsonApiMixin(object):
         data = self.dict_class()
         included = self.dict_class()
         meta = self.dict_class()
+        attributes = self.dict_class()
+        data["attributes"] = attributes
 
         for field_name, field in six.iteritems(fields):
             converted = None
@@ -370,24 +372,27 @@ class JsonApiMixin(object):
                     data,
                     converted.pop("data", {})
                 )
-                included = self.update_nested(
-                    included,
-                    converted.get("included", {})
-                )
+                included = converted.get("included", [])
+                # self.update_nested(
+                #     included,
+                #     converted.get("included", {})
+                # )
                 meta = self.update_nested(
                     meta,
                     converted.get("meta", {})
                 )
             else:
-                data[field_name] = resource[field_name]
+                attributes = self.update_nested(
+                    attributes,
+                    {field_name: resource[field_name], }
+                )
 
-        if hasattr(resource, "serializer"):
-            serializer = resource.serializer
-            model = serializer.Meta.model
+        # if hasattr(resource, "serializer"):
+        #     serializer = resource.serializer
+        #     model = serializer.Meta.model
+        #     resource_type = model_to_resource_type(model)
 
-            resource_type = self.model_to_resource_type(model)
-
-            data["type"] = resource_type
+        #     data["type"] = resource_type
 
         return {
             "data": data,
@@ -399,6 +404,13 @@ class JsonApiMixin(object):
         data = self.dict_class()
 
         data[field_name] = encoding.force_text(resource[field_name])
+
+        if hasattr(resource, "serializer"):
+            serializer = resource.serializer
+            model = serializer.Meta.model
+            resource_type = model_to_resource_type(model)
+
+            data["type"] = resource_type
 
         return {
             "data": data,
@@ -501,12 +513,12 @@ class JsonApiMixin(object):
 
         return {
             "data": {
-                "links": {
+                "relationships": {
                     field_name: {
-                        "linkage": linkage,
-                    },
-                },
-            },
+                        "data": linkage,
+                    }
+                }
+            }
         }
 
     def handle_url_field(self, resource, field, field_name, request):
@@ -536,14 +548,13 @@ class JsonApiMixin(object):
                     "type": resource_type,
                     "id": pk,
                 }
-
                 linkage.append(link)
 
         return {
             "data": {
-                "links": {
+                "relationships": {
                     field_name: {
-                        "linkage": linkage,
+                        "data": linkage,
                     },
                 },
             },

@@ -15,8 +15,8 @@ class JsonApiMixin(object):
 
         view = parser_context.get("view", None)
 
-        model = self.model_from_obj(view)
-        resource_type = self.model_to_resource_type(model)
+        # model = self.model_from_obj(view)
+        # resource_type = self.model_to_resource_type(model)
 
         resource = {}
 
@@ -34,14 +34,8 @@ class JsonApiMixin(object):
         serializer_data = view.get_serializer(instance=None)
         fields = serializer_data.fields
 
-        links = {}
         relationships = {}
         attributes = {}
-
-        if "links" in resource:
-            links = resource["links"]
-
-            del resource["links"]
 
         if "relationships" in resource:
             relationships = resource["relationships"]
@@ -66,7 +60,8 @@ class JsonApiMixin(object):
 
             if isinstance(related_field, relations.HyperlinkedRelatedField):
                 if is_related_many(field):
-                    pks = [relation["id"] for relation in relationships[field_name]["data"]]
+                    pks = [relation["id"] for relation
+                           in relationships[field_name]["data"]]
                     model = related_field.queryset.model
 
                     resource[field_name] = []
@@ -98,7 +93,8 @@ class JsonApiMixin(object):
                     resource[field_name] = url
             elif isinstance(related_field, relations.PrimaryKeyRelatedField):
                 if is_related_many(field):
-                    pks = [relation["id"] for relation in relationships[field_name]["data"]]
+                    pks = [relation["id"] for relation
+                           in relationships[field_name]["data"]]
                     resource[field_name] = []
 
                     for pk in pks:

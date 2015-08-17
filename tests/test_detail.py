@@ -1,6 +1,6 @@
 from django.core.urlresolvers import reverse
 from tests import models
-from tests.utils import dump_json, parse_json
+from tests.utils import dump_json
 import pytest
 
 pytestmark = pytest.mark.django_db

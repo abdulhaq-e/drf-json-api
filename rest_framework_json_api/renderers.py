@@ -265,9 +265,9 @@ class JsonApiMixin(object):
             if not (data and key in data):
                 raise WrapperNotApplicable('Not paginated results')
 
-        view = renderer_context.get("view", None)
-        model = self.model_from_obj(view)
-        resource_type = self.model_to_resource_type(model)
+        # view = renderer_context.get("view", None)
+        # model = self.model_from_obj(view)
+        # resource_type = self.model_to_resource_type(model)
 
         try:
             from rest_framework.utils.serializer_helpers import ReturnList
@@ -302,11 +302,11 @@ class JsonApiMixin(object):
         """
 
         wrapper = self.dict_class()
-        view = renderer_context.get("view", None)
+        # view = renderer_context.get("view", None)
         request = renderer_context.get("request", None)
 
-        model = self.model_from_obj(view)
-        resource_type = self.model_to_resource_type(model)
+        # model = self.model_from_obj(view)
+        # resource_type = self.model_to_resource_type(model)
 
         if isinstance(data, list):
             many = True

@@ -9,7 +9,8 @@ class Person(models.Model):
         "Post", blank=True, null=True, related_name="favorited_by")
 
     # To-Many Forward Relation
-    liked_comments = models.ManyToManyField("Comment", related_name="liked_by")
+    liked_comments = models.ManyToManyField("Comment", related_name="liked_by",
+                                            blank=True)
 
     class Meta:
         verbose_name_plural = "people"

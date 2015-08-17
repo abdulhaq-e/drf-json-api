@@ -13,7 +13,7 @@ def dump_json(data):
 
     version = rest_framework.__version__.split(".")
 
-    if int(version[0]) <= 3 and int(version[1]) < 1:
+    if int(version[0]) >= 3 and int(version[1]) >= 1:
         from rest_framework.compat import (SHORT_SEPARATORS, LONG_SEPARATORS,
                                            INDENT_SEPARATORS)
         from rest_framework.settings import api_settings

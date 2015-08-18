@@ -258,9 +258,9 @@ class JsonApiMixin(object):
         return wrapper
 
     def wrap_paginated(self, data, renderer_context):
-        """Convert paginated data to JSON API with meta"""
+        """Convert paginated data to JSON API with links"""
 
-        pagination_keys = ['count', 'next', 'previous', 'results']
+        pagination_keys = ['first', 'last', 'prev', 'next']
         for key in pagination_keys:
             if not (data and key in data):
                 raise WrapperNotApplicable('Not paginated results')
@@ -274,7 +274,7 @@ class JsonApiMixin(object):
 
             results = ReturnList(
                 data["results"],
-                serializer=data.serializer.fields["results"],
+                serializer=data["results"].serializer
             )
         except ImportError:
             results = data["results"]
@@ -285,7 +285,9 @@ class JsonApiMixin(object):
         # Add pagination metadata
         pagination = self.dict_class()
 
-        pagination["prev"] = data['previous']
+        pagination["first"] = data['first']
+        pagination["last"] = data['last']
+        pagination["prev"] = data['prev']
         pagination["next"] = data['next']
 
         wrapper.setdefault("links", self.dict_class())
@@ -310,7 +312,12 @@ class JsonApiMixin(object):
 
         if isinstance(data, list):
             many = True
-            resources = data
+            # We need resources with a serializer method in order to get
+            # the model.
+            from rest_framework.utils.serializer_helpers import ReturnDict
+            resources = [ReturnDict(resource,
+                                    serializer=data.serializer.child
+            ) for resource in data]
         else:
             many = False
             resources = [data]
@@ -405,6 +412,10 @@ class JsonApiMixin(object):
 
         data[field_name] = encoding.force_text(resource[field_name])
 
+        # FIXME: this should probably go else where and a fix is needed
+        # for DRF < 3.0. It is included in this method because all resources
+        # will have to pass by this method to get `id` and we use it to get
+        # `type` as well
         if hasattr(resource, "serializer"):
             serializer = resource.serializer
             model = serializer.Meta.model

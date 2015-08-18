@@ -95,9 +95,14 @@ def pytest_configure():
             "DEFAULT_PARSER_CLASSES": (
                 "rest_framework_json_api.parsers.JsonApiParser",
             ),
-            "DEFAULT_PAGINATION_CLASS": (
-                "rest_framework_json_api.pagination.JsonApiPageNumberPagination"
-                ),
+            # For DRF >= 3.1
+            # "DEFAULT_PAGINATION_CLASS": (
+            #     "rest_framework_json_api.pagination.JsonApiPageNumberPagination"
+            #     ),
+            # For DRF 3.0 and before
+            # 'DEFAULT_PAGINATION_SERIALIZER_CLASS': (
+            #     'rest_framework_json_api.pagination.JsonApiPaginationSerializer',
+            # ),
             "TEST_REQUEST_DEFAULT_FORMAT": "json",
         },
     )

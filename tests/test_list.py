@@ -7,7 +7,7 @@ Error tests are in test_errors.py
 from django.core.urlresolvers import reverse
 from tests import models
 from tests.serializers import PostSerializer
-from tests.utils import dump_json, parse_json
+from tests.utils import dump_json
 from tests.views import PersonViewSet
 import pytest
 
@@ -220,6 +220,13 @@ def test_options(client):
     if hasattr(ps, 'metadata'):
         results['meta']['actions']['POST'] = ps.metadata()
 
+    import rest_framework
+    version = rest_framework.__version__.split(".")
+
+    # for DRF 3.0 compatibility.
+    if int(version[0]) == 3 and int(version[1]) == 0:
+        results['meta']['actions']['POST']['title'].pop('max_length', None)
+
     response = client.options(reverse("post-list"))
     assert response.status_code == 200
     assert response.content == dump_json(results)
@@ -228,8 +235,23 @@ def test_options(client):
 def test_pagination(rf):
     models.Person.objects.create(name="test")
 
-    class PaginatedPersonViewSet(PersonViewSet):
-        paginate_by = 10
+    import rest_framework
+    version = rest_framework.__version__.split(".")
+
+    # for DRF 3.0 compatibility.
+    if int(version[0]) == 3 and int(version[1]) == 0:
+        from rest_framework_json_api.pagination import (
+            JsonApiPaginationSerializer)
+
+        class PaginatedPersonViewSet(PersonViewSet):
+            paginate_by = 10
+            pagination_serializer_class = JsonApiPaginationSerializer
+    else:
+        from rest_framework_json_api.pagination import (
+            JsonApiPageNumberPagination)
+
+        class PaginatedPersonViewSet(PersonViewSet):
+            pagination_class = JsonApiPageNumberPagination
 
     request = rf.get(
         reverse("person-list"), content_type="application/vnd.api+json")
@@ -260,5 +282,4 @@ def test_pagination(rf):
             "next": None
         },
     }
-
     assert response.content == dump_json(results)

@@ -259,7 +259,6 @@ class JsonApiMixin(object):
 
     def wrap_paginated(self, data, renderer_context):
         """Convert paginated data to JSON API with links"""
-
         pagination_keys = ['first', 'last', 'prev', 'next']
         for key in pagination_keys:
             if not (data and key in data):
@@ -276,6 +275,13 @@ class JsonApiMixin(object):
                 data["results"],
                 serializer=data["results"].serializer
             )
+        except AttributeError:
+            # for DRF 3.0
+            from rest_framework.utils.serializer_helpers import ReturnList
+
+            results = ReturnList(
+                data["results"],
+                serializer=data.serializer.fields['results'])
         except ImportError:
             results = data["results"]
 
@@ -314,10 +320,13 @@ class JsonApiMixin(object):
             many = True
             # We need resources with a serializer method in order to get
             # the model.
-            from rest_framework.utils.serializer_helpers import ReturnDict
-            resources = [ReturnDict(resource,
-                                    serializer=data.serializer.child
-            ) for resource in data]
+            try:
+                from rest_framework.utils.serializer_helpers import ReturnDict
+                resources = [ReturnDict(
+                    resource,
+                    serializer=data.serializer.child) for resource in data]
+            except AttributeError:
+                resources = data
         else:
             many = False
             resources = [data]

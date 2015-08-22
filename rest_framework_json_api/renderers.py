@@ -332,7 +332,7 @@ class JsonApiMixin(object):
             resources = [data]
 
         items = []
-        included = {}
+        included = []
 
         for resource in resources:
             converted = self.convert_resource(resource, data, request)
@@ -340,8 +340,9 @@ class JsonApiMixin(object):
             converted_data = converted.get("data", {})
             items.append(converted_data)
 
-            converted_included = converted.get("included", {})
-            included.update(converted_included)
+            converted_included = converted.get("included", None)
+            if converted_included is not None:
+                included.extend(converted_included)
 
         if many:
             wrapper["data"] = items
@@ -349,7 +350,7 @@ class JsonApiMixin(object):
             wrapper["data"] = items[0]
 
         if included:
-            wrapper["included"] = included.items()
+            wrapper["included"] = included
 
         return wrapper
 
@@ -456,15 +457,26 @@ class JsonApiMixin(object):
 
         resource_type = self.model_to_resource_type(model)
 
-        linked_ids = self.dict_class()
-        links = self.dict_class()
-        linked = self.dict_class()
-        linked[resource_type] = []
+        included_ids = self.dict_class()
+        linkage = None
+        included = []
 
         if is_related_many(field):
             items = resource[field_name]
+            linkage = []
+            ids = [encoding.force_text(item["id"]) for item in items]
+            for id in ids:
+                link = {
+                    "type": resource_type,
+                    "id": id,
+                }
+                linkage.append(link)
         else:
             items = [resource[field_name]]
+            linkage = {
+                "type": resource_type,
+                "id": encoding.force_text(items[0]["id"]),
+            }
 
         obj_ids = []
 
@@ -472,39 +484,48 @@ class JsonApiMixin(object):
 
         for item in items:
             converted = self.convert_resource(item, resource, request)
-            linked_obj = converted["data"]
-            linked_ids = converted.pop("linked_ids", {})
-
-            if linked_ids:
-                linked_obj["links"] = linked_ids
+            included_obj = converted["data"]
+            included_ids = converted.pop("linked_ids", {})
+            included_obj.update({"type": resource_type})
+            # if included_ids:
+            #     included_obj["links"] = linked_ids
 
             obj_ids.append(converted["data"]["id"])
 
-            field_links = self.prepend_links_with_name(
-                converted.get("links", {}), resource_type)
+            # field_links = self.prepend_links_with_name(
+            #     converted.get("links", {}), resource_type)
 
-            field_links[field_name] = {
-                "type": resource_type,
-            }
+            # field_links[field_name] = {
+            #     "type": resource_type,
+            # }
 
-            if "href" in converted["data"]:
-                url_field_name = api_settings.URL_FIELD_NAME
-                url_field = serializer_field.fields[url_field_name]
+            # if "href" in converted["data"]:
+            #     url_field_name = api_settings.URL_FIELD_NAME
+            #     url_field = serializer_field.fields[url_field_name]
 
-                field_links[field_name]["href"] = self.url_to_template(
-                    url_field.view_name, request, field_name,
-                )
+            #     field_links[field_name]["href"] = self.url_to_template(
+            #         url_field.view_name, request, field_name,
+            #     )
 
-            links.update(field_links)
+            # links.update(field_links)
 
-            linked[resource_type].append(linked_obj)
+            included.append(included_obj)
 
         if is_related_many(field):
-            linked_ids[field_name] = obj_ids
+            included_ids[field_name] = obj_ids
         else:
-            linked_ids[field_name] = obj_ids[0]
+            included_ids[field_name] = obj_ids[0]
 
-        return {"linked_ids": linked_ids, "links": links, "linked": linked}
+        return {
+            "data": {
+                "relationships": {
+                    field_name: {
+                        "data": linkage,
+                    }
+                }
+            },
+            "included": included
+        }
 
     def handle_related_field(self, resource, field, field_name, request):
         related_field = get_related_field(field)
